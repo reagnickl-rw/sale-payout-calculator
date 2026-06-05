@@ -65,9 +65,17 @@
     background: var(--surface);
   }
   .tranches table { width: 100%; font-size: 14px; border-collapse: collapse; }
-  .tranches td { padding: 8px 0; }
-  .tranches td:first-child { color: var(--text-muted); }
-  .tranches td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .tranches th { text-align: left; font-weight: 500; color: var(--text-muted); font-size: 12px; padding: 8px 6px 4px; border-bottom: 1px solid var(--border); }
+  .tranches th.num { text-align: right; }
+  .tranches th.act { width: 32px; }
+  .tranches tbody td { padding: 6px 6px; vertical-align: middle; color: var(--text-muted); }
+  .tranches tbody td.payout { text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+  .tranches tbody input[type=number] { padding: 6px 8px; font-size: 13px; width: 100%; }
+  .tr-uw { color: var(--text-hint); font-size: 11px; display: block; }
+  .remove-btn { background: transparent; border: none; color: var(--text-hint); cursor: pointer; font-size: 18px; padding: 2px 6px; border-radius: 6px; line-height: 1; }
+  .remove-btn:hover { background: var(--surface-2); color: var(--text); }
+  .add-btn { background: transparent; border: 1px dashed var(--border); color: var(--text-muted); padding: 8px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; margin: 10px 0 6px; width: 100%; }
+  .add-btn:hover { color: var(--text); border-color: var(--text-hint); }
   .note { font-size: 12px; color: var(--text-hint); }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 1rem; }
   .card { background: var(--surface-2); border-radius: 10px; padding: 1rem; }
@@ -180,15 +188,17 @@
 
   <div class="tranches">
     <table>
-      <tr>
-        <td>43,000 shares @ $1.99 strike</td>
-        <td id="t1">$9,986</td>
-      </tr>
-      <tr>
-        <td>10,000 shares @ $3.51 strike <span class="note" id="t2note"></span></td>
-        <td id="t2">$0</td>
-      </tr>
+      <thead>
+        <tr>
+          <th>Vested shares</th>
+          <th>Strike price</th>
+          <th class="num">Payout</th>
+          <th class="act"></th>
+        </tr>
+      </thead>
+      <tbody id="tranchesBody"></tbody>
     </table>
+    <button type="button" id="addTranche" class="add-btn">+ Add more shares</button>
   </div>
 
   <div class="cards">
@@ -214,7 +224,29 @@
 <script>
 const $ = id => document.getElementById(id);
 const fmt = n => '$' + Math.round(n).toLocaleString('en-US');
-const T1_SH = 43000, T1_K = 1.99, T2_SH = 10000, T2_K = 3.51, FICA = 0.0765;
+const FICA = 0.0765;
+
+let tranches = [
+  { shares: 43000, strike: 1.99 },
+  { shares: 10000, strike: 3.51 }
+];
+
+function renderTranches() {
+  const tbody = $('tranchesBody');
+  tbody.innerHTML = '';
+  tranches.forEach((t, i) => {
+    const tr = document.createElement('tr');
+    const removeCell = tranches.length > 1
+      ? `<button type="button" class="remove-btn" data-remove="${i}" aria-label="Remove tranche">×</button>`
+      : '';
+    tr.innerHTML =
+      `<td><input type="number" min="0" step="1" data-field="shares" data-i="${i}" value="${t.shares}"></td>` +
+      `<td><input type="number" min="0" step="0.01" data-field="strike" data-i="${i}" value="${t.strike}"></td>` +
+      `<td class="payout"><span data-payout="${i}">$0</span><span class="tr-uw" data-uw="${i}"></span></td>` +
+      `<td class="act">${removeCell}</td>`;
+    tbody.appendChild(tr);
+  });
+}
 
 const STATE_RATES = {
   AL: 0.050, AK: 0, AZ: 0.025, AR: 0.044, CA: 0.133, CO: 0.044,
@@ -243,13 +275,16 @@ function calc(priceOverride) {
   const pps = shares > 0 ? residual / shares : 0;
   $('pps').textContent = '$' + pps.toFixed(2);
 
-  const g1 = Math.max(0, (pps - T1_K) * T1_SH);
-  const g2 = Math.max(0, (pps - T2_K) * T2_SH);
-  $('t1').textContent = fmt(g1);
-  $('t2').textContent = fmt(g2);
-  $('t2note').textContent = pps < T2_K ? '— underwater' : '';
+  let pre = 0;
+  tranches.forEach((t, i) => {
+    const gain = Math.max(0, (pps - t.strike) * t.shares);
+    pre += gain;
+    const payEl = document.querySelector(`[data-payout="${i}"]`);
+    const uwEl = document.querySelector(`[data-uw="${i}"]`);
+    if (payEl) payEl.textContent = fmt(gain);
+    if (uwEl) uwEl.textContent = (t.shares > 0 && pps < t.strike) ? 'underwater' : '';
+  });
 
-  const pre = g1 + g2;
   const rate = fed + stateRate + (iso ? 0 : FICA);
   const tax = pre * rate;
   $('pretax').textContent = fmt(pre);
@@ -273,6 +308,27 @@ $('priceNum').addEventListener('input', () => {
 ['fed', 'state', 'otype', 'pref', 'shares'].forEach(id => $(id).addEventListener('input', () => {
   calc((+$('priceNum').value || 0) * 1e6);
 }));
+
+$('tranchesBody').addEventListener('input', (e) => {
+  const f = e.target.dataset.field;
+  if (!f) return;
+  tranches[+e.target.dataset.i][f] = +e.target.value || 0;
+  calc((+$('priceNum').value || 0) * 1e6);
+});
+$('tranchesBody').addEventListener('click', (e) => {
+  const r = e.target.dataset.remove;
+  if (r === undefined) return;
+  tranches.splice(+r, 1);
+  renderTranches();
+  calc((+$('priceNum').value || 0) * 1e6);
+});
+$('addTranche').addEventListener('click', () => {
+  tranches.push({ shares: 0, strike: 0 });
+  renderTranches();
+  calc((+$('priceNum').value || 0) * 1e6);
+});
+
+renderTranches();
 calc();
 </script>
 </body>
