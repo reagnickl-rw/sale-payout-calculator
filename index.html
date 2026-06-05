@@ -85,6 +85,14 @@
   .card.hero .value { color: var(--accent-dark); }
   .detail { font-size: 13px; color: var(--text-hint); margin: 0 0 2rem; }
   .disclaimer { font-size: 12px; color: var(--text-hint); border-top: 1px solid var(--border); padding-top: 1rem; }
+  .treats { margin-top: 2.5rem; }
+  .treats-head { font-size: 12px; font-weight: 500; color: var(--text-muted); margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .treats-sub { font-size: 13px; color: var(--text-hint); margin: 0 0 12px; }
+  .treat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .treat { background: var(--surface-2); border-radius: 12px; padding: 1.25rem 1rem; text-align: center; }
+  .treat .emoji { font-size: 44px; line-height: 1; margin-bottom: 10px; }
+  .treat .tname { font-size: 14px; font-weight: 500; color: var(--text); margin: 0 0 4px; }
+  .treat .tprice { font-size: 13px; color: var(--text-muted); font-variant-numeric: tabular-nums; margin: 0; }
 </style>
 </head>
 <body>
@@ -219,12 +227,72 @@
   <p class="detail" id="detail">Federal 22% + Utah 4.5% + FICA 7.65%</p>
 
   <p class="disclaimer">Estimates only. Assumes a non-participating 1x preference, cashless exercise taxed as ordinary income at a flat marginal rate, and a flat top-bracket state income tax. State rates are approximations and may not reflect brackets, deductions, or recent law changes. Not tax or financial advice — confirm with a professional.</p>
+
+  <div class="treats">
+    <p class="treats-head">Treat yourself</p>
+    <p class="treats-sub" id="treatsSub">Three things in the neighborhood of your take-home.</p>
+    <div class="treat-cards" id="treats"></div>
+  </div>
 </div>
 
 <script>
 const $ = id => document.getElementById(id);
 const fmt = n => '$' + Math.round(n).toLocaleString('en-US');
 const FICA = 0.0765;
+
+const TREATS = [
+  { name: 'Nice steakhouse dinner', price: 200, emoji: '🥩' },
+  { name: 'Bottle of single malt', price: 300, emoji: '🥃' },
+  { name: 'Sony WH-1000XM5 headphones', price: 400, emoji: '🎧' },
+  { name: 'AirPods Max', price: 550, emoji: '🎧' },
+  { name: 'Weber Genesis grill', price: 900, emoji: '🍖' },
+  { name: 'New golf clubs', price: 1200, emoji: '🏌️' },
+  { name: 'Apple Watch Ultra', price: 800, emoji: '⌚' },
+  { name: 'Designer leather bag', price: 1500, emoji: '👜' },
+  { name: '4K projector setup', price: 2500, emoji: '🎬' },
+  { name: 'High-end road bike', price: 3500, emoji: '🚴' },
+  { name: 'Espresso machine', price: 3000, emoji: '☕' },
+  { name: '77" OLED TV', price: 3500, emoji: '📺' },
+  { name: 'Custom gaming PC', price: 4000, emoji: '🖥️' },
+  { name: 'Weekend in Tulum', price: 2800, emoji: '🏝️' },
+  { name: 'Vintage Fender Strat', price: 5000, emoji: '🎸' },
+  { name: 'Bespoke tailored suit', price: 4500, emoji: '🤵' },
+  { name: 'Vespa scooter', price: 6500, emoji: '🛵' },
+  { name: 'Rolex Datejust', price: 9500, emoji: '⌚' },
+  { name: 'Business class to Europe', price: 8000, emoji: '✈️' },
+  { name: 'Hermès Birkin (small)', price: 15000, emoji: '👜' },
+  { name: 'New Honda Civic', price: 26000, emoji: '🚗' },
+  { name: 'Kitchen remodel', price: 35000, emoji: '🍳' },
+  { name: 'Tesla Model 3', price: 42000, emoji: '🚗' },
+  { name: 'Backyard pool', price: 75000, emoji: '🏊' },
+  { name: 'Around-the-world trip', price: 80000, emoji: '🌎' },
+  { name: 'Tesla Model S Plaid', price: 110000, emoji: '🚗' },
+  { name: 'Porsche 911 Carrera', price: 130000, emoji: '🏎️' },
+  { name: 'Down payment on a house', price: 150000, emoji: '🏠' },
+  { name: 'Lamborghini Huracán', price: 270000, emoji: '🏎️' },
+  { name: 'Modest beach house', price: 600000, emoji: '🏖️' },
+  { name: 'Private jet share', price: 750000, emoji: '🛩️' },
+  { name: 'Yacht share', price: 1500000, emoji: '🛥️' },
+  { name: 'A small private island', price: 3000000, emoji: '🏝️' }
+];
+
+function renderTreats(takeHome) {
+  const sorted = [...TREATS].sort((a, b) =>
+    Math.abs(a.price - takeHome) - Math.abs(b.price - takeHome)
+  );
+  const picks = sorted.slice(0, 3).sort((a, b) => a.price - b.price);
+  const wrap = $('treats');
+  wrap.innerHTML = '';
+  picks.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'treat';
+    div.innerHTML =
+      `<div class="emoji">${t.emoji}</div>` +
+      `<p class="tname">${t.name}</p>` +
+      `<p class="tprice">~${fmt(t.price)}</p>`;
+    wrap.appendChild(div);
+  });
+}
 
 let tranches = [
   { shares: 10000, strike: 1.98 }
@@ -286,9 +354,11 @@ function calc(priceOverride) {
 
   const rate = fed + stateRate + (iso ? 0 : FICA);
   const tax = pre * rate;
+  const net = pre - tax;
   $('pretax').textContent = fmt(pre);
   $('tax').textContent = fmt(tax);
-  $('net').textContent = fmt(pre - tax);
+  $('net').textContent = fmt(net);
+  renderTreats(net);
   $('detail').textContent = 'Federal ' + (fed * 100).toFixed(0) + '% + ' +
     stateName + ' ' + (stateRate * 100).toFixed(2) + '%' +
     (iso ? ' (ISO: no FICA; assumes disqualifying disposition — ordinary income)' : ' + FICA 7.65%') +
